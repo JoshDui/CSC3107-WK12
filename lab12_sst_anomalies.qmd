@@ -12,7 +12,7 @@ execute:
   cache: true
 ---
 
-# Plan the map encodings
+# 3.1 Plan the Map Encodings
 
 ## Why map anomaly rather than absolute SST?
 
@@ -26,7 +26,7 @@ The anomaly requires a diverging scale because it contains meaningful values on 
 
 Both panels must use identical limits so that the same color represents the same anomaly magnitude in each December. Independently rescaled panels could make a weak pattern appear as intense as a strong one and would undermine comparison of both intensity and spatial extent. A common symmetric range calculated from the pooled open-ocean data provides an honest basis for comparison.
 
-# Start coding
+# 3.2 Start coding
 
 ```{r}
 #| label: setup
@@ -47,9 +47,7 @@ knitr::opts_chunk$set(
 options(dplyr.summarise.inform = FALSE)
 ```
 
-# Import the daily grids as `stars` data cubes
-
-The files are sorted before import so the time dimension is deterministic. Each NOAA file also contains a singleton `zlev` dimension; it is dropped because this exercise uses one surface layer and requires dimensions `x`, `y`, and `time` only. `read_stars()` is given `along = "time"`, after which the integer file positions are replaced by the dates parsed from the filenames.
+# 3.3 Import the daily grids as `stars` data cubes
 
 ```{r}
 #| label: import-data
@@ -94,7 +92,7 @@ dec_2010 <- read_december(
 )
 ```
 
-## Import verifier
+## 3.3 Import verifier
 
 ```{r}
 #| label: verify-import
@@ -134,9 +132,7 @@ bind_rows(
 )
 ```
 
-# Establish the coordinate reference system
-
-The NetCDF coordinates describe longitude and latitude, but the imported CRS is undefined. `st_set_crs()` assigns the required WGS 84 metadata without moving or resampling any cells.
+# 3.4 Establish the coordinate reference system
 
 ```{r}
 #| label: assign-crs
@@ -183,9 +179,7 @@ crs_checks
 st_bbox(dec_2009)
 ```
 
-# Calculate monthly cell summaries
-
-For anomaly, available daily values are averaged and an all-missing cell remains `NaN`. For ice, a missing daily value means no recorded ice and therefore contributes zero to the 31-day mean; using `na.rm = TRUE` would incorrectly change the denominator.
+# 3.5 Calculate monthly cell summaries
 
 ```{r}
 #| label: monthly-summaries
@@ -219,7 +213,7 @@ summary_2009 <- make_month_summary(dec_2009)
 summary_2010 <- make_month_summary(dec_2010)
 ```
 
-## Monthly-summary verifier
+## 3.5 Monthly-summary verifier
 
 ```{r}
 #| label: verify-monthly-summaries
@@ -258,9 +252,7 @@ bind_rows(
 )
 ```
 
-# Derive surface classes
-
-The rules are applied in their required priority order: land first, then cells meeting the sea-ice threshold, then non-land cells with a missing anomaly, and finally open ocean. Storing the result as a factor keeps its categorical meaning explicit.
+# 3.6 Derive surface classes
 
 ```{r}
 #| label: surface-classes
@@ -296,7 +288,7 @@ summary_2009 <- add_surface(summary_2009)
 summary_2010 <- add_surface(summary_2010)
 ```
 
-## Surface-class verifier
+## 3.6 Surface-class verifier
 
 ```{r}
 #| label: verify-surface-classes
@@ -333,7 +325,7 @@ bind_rows(
 )
 ```
 
-# Combine the monthly summaries along a year dimension
+# 3.7 Combine the monthly summaries along a year dimension
 
 ```{r}
 #| label: combine-years
@@ -375,8 +367,6 @@ tibble(
 )
 ```
 
-The daily cubes and separate monthly objects have now passed their checks. Removing them releases memory while retaining the combined data required for every map below.
-
 ```{r}
 #| label: release-intermediate-memory
 #| cache: false
@@ -385,7 +375,7 @@ rm(dec_2009, dec_2010, summary_2009, summary_2010)
 invisible(gc())
 ```
 
-# Draft a first faceted raster map
+# 3.8 Draft a first faceted raster map
 
 ```{r}
 #| label: first-draft-map
@@ -416,7 +406,7 @@ The first draft has six important shortcomings:
 
 6. The year-only facet labels and default plot furniture do not identify the ENSO phases, anomaly baseline, unit, source, or intended geographic focus.
 
-# Design a diverging fill scale
+# 3.9 Design a diverging fill scale
 
 ```{r}
 #| label: anomaly-mask-and-limit
@@ -443,8 +433,6 @@ tibble(
   shared_rounded_limit_c = limit
 )
 ```
-
-Across the pooled open-ocean cells from both years, the 99th percentile of absolute anomaly is `r sprintf("%.2f", pooled_q99)` degrees C. Rounding upward gives a common limit of `r limit` degrees C for both panels.
 
 ```{r}
 #| label: diverging-map
@@ -474,7 +462,7 @@ diverging_map <- ggplot() +
 diverging_map
 ```
 
-# Add land and sea ice as surface layers
+# 3.10 Add land and sea ice as surface layers
 
 The anomaly raster must be drawn first and the surface classes above it. Opaque land and sea-ice fills then cover any underlying raster values, while transparent open-ocean cells reveal the anomaly layer. Reversing the order would allow the anomaly raster to paint over land or sea ice and would make the categorical mask visually unreliable.
 
@@ -517,7 +505,7 @@ surface_overlay_map
 
 The surface rules classify every non-land cell with a missing monthly anomaly as sea ice before assigning the remaining cells to open ocean. Consequently, a cell can become open ocean only when its monthly anomaly is available and its mean ice concentration is below 0.15. Because `open_ocean_anom` copies `mean_anom` exactly at those cells, the transparent surface overlay cannot expose a missing anomaly if the rules were implemented correctly.
 
-## Anomaly-mask verifier
+## 3.10 Anomaly-mask verifier
 
 ```{r}
 #| label: verify-anomaly-mask
@@ -544,13 +532,7 @@ tibble(
 )
 ```
 
-The verifier finds `r open_ocean_mismatches` open-ocean mismatches and `r non_ocean_nonmissing` non-open-ocean cells with a visible masked anomaly. The invariant therefore holds by construction and is confirmed by the data.
-
-# Compare equal-area world projections
-
-Both candidate projections use 180 degrees as their central meridian, keeping the equatorial Pacific in the middle and placing the source grid's 0/360-degree seam at the frame edges. The helper below trims the polar cells, constructs the required 50-km target grid, applies nearest-neighbor resampling, and masks the warped raster to a densified world boundary.
-
-The boundary includes intermediate longitude waypoints before `st_segmentize()` is called. This prevents a geographic line directly joining longitudes near 0 and 360 degrees from following the short path across the seam.
+# 3.11 Compare equal-area world projections
 
 The `lwgeom` package supplies the geodetic segmentization engine required by this installation of `sf`, allowing the boundary edges to be densified with a maximum segment length expressed in degrees.
 
@@ -898,7 +880,7 @@ With identical data and limits, the December contrast is more visually prominent
 
 Both candidates are equal-area, so either supports comparisons of spatial extent. Mollweide is chosen because its broad, 180-degree-centered equatorial span keeps the Pacific signal central and clearest in the rendered comparison. Its elliptical outline also reads immediately as a complete world map. The tradeoff is unused corner space and compression of the poles to points, which is acceptable because the principal analytic focus is equatorial SST anomaly rather than polar shape.
 
-# Build the final continuous two-panel map
+# 3.12 Build the final continuous two-panel map
 
 ```{r}
 #| label: final-continuous-map
@@ -923,9 +905,7 @@ final_continuous <- build_continuous_map(
 final_continuous
 ```
 
-# Bin the anomaly scale
-
-The classified version uses one-degree bounded intervals from `-limit` to `+limit`, plus a separate open-ended class beyond each endpoint. Its data, projection, surface mask, frame, labels, layout, title, subtitle, and caption are otherwise identical to the continuous version.
+# 3.13 Bin the anomaly scale
 
 ```{r}
 #| label: binned-map-functions
@@ -1097,7 +1077,7 @@ final_binned <- build_binned_map(
 final_binned
 ```
 
-# Reflect on the visualization
+# 3.14 Reflect on the visualization
 
 ## Difference between the two Decembers
 
