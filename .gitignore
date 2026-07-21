@@ -1,0 +1,16 @@
+# Public source data (about 102 MB; download separately from NOAA/NCEI)
+oisst_daily/
+
+# Quarto/knitr generated intermediates
+lab12_sst_anomalies_cache/
+lab12_sst_anomalies_files/
+/.quarto/
+
+# Local quality-assurance artifacts
+qa_previews/
+lab12_syntax_check.R
+
+# R/IDE state
+.Rhistory
+.RData
+.Rproj.user/
