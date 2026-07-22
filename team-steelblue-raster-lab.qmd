@@ -14,15 +14,15 @@ execute:
 
 # 3.1 Plan the Map Encodings
 
-## Why map anomaly rather than absolute SST?
+## Why should anom, rather than sst, determine the principal fill colors?
 
 The principal fill should represent `anom` because the task is to compare departures from each location's usual temperature, not absolute ocean temperature. Absolute SST would be dominated by the normal contrast between warm tropical water and cold high-latitude water, obscuring the interannual signal. The anomaly instead identifies where December conditions were warmer or cooler than the 1971-2000 climatological value for that location and day of year.
 
-## What scale should represent anomaly?
+## Should the anomaly scale be sequential or diverging? What does its central value represent?
 
 The anomaly requires a diverging scale because it contains meaningful values on both sides of a reference point. Its center is 0 degrees C, meaning the observed SST equals its 1971-2000 climatological value; negative and positive values indicate cooler- and warmer-than-normal conditions respectively. A perceptually neutral color at zero separates these two directions without implying that zero is another low or high value.
 
-## Why must both panels use identical limits?
+## Why should both panels use identical anomaly-scale limits?
 
 Both panels must use identical limits so that the same color represents the same anomaly magnitude in each December. Independently rescaled panels could make a weak pattern appear as intense as a strong one and would undermine comparison of both intensity and spatial extent. A common symmetric range calculated from the pooled open-ocean data provides an honest basis for comparison.
 
