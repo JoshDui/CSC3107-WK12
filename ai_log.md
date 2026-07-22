@@ -345,6 +345,102 @@ continuous_anomaly_scale <- function(limit_value, omit_missing = FALSE) {
 }
 ```
 
+Still in Section 3.11, before the actual warping step, we are building a rectangular boundary ring and an equator line in plain longitude-latitude space, so we can transform them into the projected CRS and draw them as a frame and a reference line on top of the raster.
+
+Here is our draft so far:
+
+```r
+world_longitudes <- function(epsilon = 1e-4, waypoint_degrees = 5) {
+  c(
+    epsilon,
+    seq(waypoint_degrees, 360 - waypoint_degrees, by = waypoint_degrees),
+    360 - epsilon
+  )
+}
+
+make_lonlat_boundary <- function(epsilon = 1e-4, latitude = 89.5, waypoint_degrees = 5) {
+  longitudes <- world_longitudes(epsilon, waypoint_degrees)
+
+  bottom <- cbind(longitudes, -latitude)
+  right <- cbind(360 - epsilon, c(-latitude, latitude))
+  top <- cbind(rev(longitudes), latitude)
+  left <- cbind(epsilon, c(latitude, -latitude))
+
+  ring <- rbind(
+    bottom,
+    right[-1, , drop = FALSE],
+    top[-1, , drop = FALSE],
+    left[-1, , drop = FALSE]
+  )
+
+  st_sfc(st_polygon(list(unname(ring))), crs = "OGC:CRS84")
+}
+```
+
+When we transform this with `st_transform()` into Mollweide and plot it as the outer frame, it does not look like a smooth ellipse. Is there a better way to get a properly smooth, curved boundary outline after projection without brute-forcing the waypoint spacing?
+
+Thought for a few seconds
+This is a common issue when reprojecting straight-line geometry: `st_transform()` only moves the vertices you supply, so any gap between two vertices is still drawn as a straight chord in the new CRS, no matter how curved the true projected path would be. Shrinking `waypoint_degrees` only helps the top and bottom edges, since that is the only place it is used; the left and right edges would still be a single two-point chord no matter how small you make it. You would have to add a separate waypoint scheme for those edges too, and then keep the spacing on all four edges consistent by hand.
+
+The cleaner tool for this is `st_segmentize()`. Instead of you hand-picking a waypoint spacing, it walks along an existing line or polygon boundary and inserts extra vertices wherever a segment exceeds a maximum length you specify, so the geometry has enough intermediate points to bend correctly once transformed. You can keep your coarser 5-degree `world_longitudes()` ring as the starting shape and just densify it further before transforming.
+
+One detail: because your boundary is in a geographic (longitude-latitude) CRS, `st_segmentize()` expects the maximum length as an explicit units object rather than a bare number, so wrap it with `set_units()` from the `units` package. The equator line can be built and densified the same way, using a single row of longitudes at latitude 0 instead of a closed ring.
+
+```r
+make_lonlat_boundary <- function(
+    epsilon = 1e-4,
+    latitude = 89.5,
+    waypoint_degrees = 5,
+    max_segment_degrees = 0.25) {
+  longitudes <- world_longitudes(epsilon, waypoint_degrees)
+
+  bottom <- cbind(longitudes, -latitude)
+  right <- cbind(360 - epsilon, c(-latitude, latitude))
+  top <- cbind(rev(longitudes), latitude)
+  left <- cbind(epsilon, c(latitude, -latitude))
+
+  ring <- rbind(
+    bottom,
+    right[-1, , drop = FALSE],
+    top[-1, , drop = FALSE],
+    left[-1, , drop = FALSE]
+  )
+
+  boundary <- st_sfc(
+    st_polygon(list(unname(ring))),
+    crs = "OGC:CRS84"
+  )
+
+  st_segmentize(
+    boundary,
+    dfMaxLength = set_units(max_segment_degrees, "degree")
+  )
+}
+
+make_lonlat_equator <- function(
+    epsilon = 1e-4,
+    waypoint_degrees = 5,
+    max_segment_degrees = 0.25) {
+  equator <- st_sfc(
+    st_linestring(cbind(
+      world_longitudes(epsilon, waypoint_degrees),
+      0
+    )),
+    crs = "OGC:CRS84"
+  )
+
+  st_segmentize(
+    equator,
+    dfMaxLength = set_units(max_segment_degrees, "degree")
+  )
+}
+```
+
+### Key points:
+- **`st_segmentize()`**: adds vertices along existing edges up to a maximum segment length, so you no longer need to hand-tune a uniform waypoint spacing.
+- **`set_units(max_segment_degrees, "degree")`**: gives `dfMaxLength` an explicit unit, which `st_segmentize()` requires on a geographic CRS.
+- Both helpers share the same coarse `world_longitudes()` ring as a starting point and then densify it, so the boundary and the equator line curve smoothly once transformed into Equal Earth or Mollweide.
+
 We are now on Section 3.11, trying to implement the `project_summary` function.
 We need to:
 1. Trim the poles (keep latitudes where absolute `y` value is <= 89.5 degrees).

@@ -1090,3 +1090,18 @@ Restricting the quantitative layer to open ocean keeps the anomaly scale tied to
 ## Continuous versus binned anomaly color
 
 For comparing spatial extent, the binned scale is stronger because common threshold colors make the footprints of comparable warm and cool classes easier to trace across panels. It sacrifices within-bin variation and creates an artificial visual boundary between values that may be numerically very close. The continuous scale preserves subtle gradients and local structure, but the boundary of any specified anomaly range is less distinct. The binned version is therefore preferred for extent comparison, while the continuous version remains more informative when fine variation matters.
+
+# 4.1 Reflect on AI Use
+Our team used ChatGPT as our web-based AI tool.
+
+One useful suggestion came in Section 3.11 where we had some issues constructing the map plot. We described the problem and our own workaround to ChatGPT, and it introduced st_segmentize() as the right tool to densify a line or polygon up to a maximum segment length instead of us hand-tuning a uniform spacing.
+
+That same response was incomplete as it never mentioned that segmentizing on a geographic CRS also depends on the lwgeom package, which isn't one of the packages in Section 2.2. We only found this out after running the suggested code block so we added a short note before the projection-functions chunk explaining what lwgeom provides and why it's required.
+
+# 4.2 Member’s Role and Contributions
+# Task 5.2
+- Joshua Dui: Coder
+- Benjamin: Navigator
+- Mei Yuen: Verifier
+- Dannon: Constructive Critic and Reporter
+- Danish: AI Liaison
