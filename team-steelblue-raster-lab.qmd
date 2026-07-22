@@ -1099,7 +1099,6 @@ One useful suggestion came in Section 3.11 where we had some issues constructing
 That same response was incomplete as it never mentioned that segmentizing on a geographic CRS also depends on the lwgeom package, which isn't one of the packages in Section 2.2. We only found this out after running the suggested code block so we added a short note before the projection-functions chunk explaining what lwgeom provides and why it's required.
 
 # 4.2 Member’s Role and Contributions
-# Task 5.2
 - Joshua Dui: Coder
 - Benjamin: Navigator
 - Mei Yuen: Verifier
